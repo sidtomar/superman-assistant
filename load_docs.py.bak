@@ -1,0 +1,72 @@
+import os
+from pptx import Presentation
+from lxml import etree
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
+
+DOCS_FOLDER = "./superman_docs"
+VECTOR_DB_FOLDER = "./superman_vectordb"
+NS = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+
+def load_documents():
+    docs = []
+    for file in os.listdir(DOCS_FOLDER):
+        path = os.path.join(DOCS_FOLDER, file)
+        print(f"Loading: {file}")
+        try:
+            if file.endswith(".pptx"):
+                prs = Presentation(path)
+                for i, slide in enumerate(prs.slides):
+                    xml = slide._element.xml
+                    tree = etree.fromstring(xml.encode())
+                    texts = tree.findall(".//a:t", NS)
+                    text_parts = [t.text.strip() for t in texts if t.text and t.text.strip()]
+                    # full_text = "\n".join(text_parts).strip()
+                    full_text = "\n".join(text_parts).strip()
+                    # Clean up superscript artifacts like "15 th" -> "15th"
+                    import re
+                    full_text = re.sub(r'(\d+)\s+(st|nd|rd|th)\b', r'\1\2', full_text)
+                               
+                    if full_text:
+                        docs.append(Document(
+                            page_content=full_text,
+                            metadata={"source": file, "slide": i + 1}
+                        ))
+                print(f"  Loaded {len(prs.slides)} slides OK")
+            elif file.endswith(".pdf"):
+                loader = PyPDFLoader(path)
+                docs.extend(loader.load())
+                print(f"  Loaded OK")
+            elif file.endswith(".docx"):
+                loader = Docx2txtLoader(path)
+                docs.extend(loader.load())
+                print(f"  Loaded OK")
+            else:
+                print(f"  Skipping: {file}")
+        except Exception as e:
+            print(f"  Error: {e}")
+    return docs
+
+def main():
+    print("--- Step 1: Loading documents ---")
+    raw_docs = load_documents()
+    print(f"Total slides loaded: {len(raw_docs)}")
+    print("--- Step 2: Splitting into chunks ---")
+    # splitter = RecursiveCharacterTextSplitter(chunk_size=200, chunk_overlap=30)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=100)
+    chunks = splitter.split_documents(raw_docs)
+    print(f"Total chunks created: {len(chunks)}")
+    print("--- Step 3: Loading embedding model ---")
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    print("Embedding model loaded OK")
+    print("--- Step 4: Storing in ChromaDB ---")
+    vectordb = Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=VECTOR_DB_FOLDER)
+    print(f"ChromaDB saved to: {VECTOR_DB_FOLDER}")
+    print(f"Total vectors stored: {vectordb._collection.count()}")
+    print("All done! Superman docs are indexed and ready.")
+
+if __name__ == "__main__":
+    main()

@@ -1,21 +1,9 @@
-# Virtual environment — never push this
 venv/
-
-# ChromaDB — never push this (too large)
 superman_vectordb/
-
-# Superman docs — never push (confidential)
-superman_docs/
-
-# Python cache
 __pycache__/
 *.pyc
 *.pyo
-
-# Environment files
 .env
 *.env
-
-# Windows
 Thumbs.db
 desktop.ini

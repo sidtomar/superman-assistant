@@ -75,7 +75,6 @@ if prompt := st.chat_input("Ask anything about Superman..."):
     with st.chat_message("user"):
         st.markdown(prompt)
     with st.chat_message("assistant"):
-	
 		with st.spinner("Searching Superman docs..."):
             try:
                 # DEBUG: Show what chunks are being passed to GPT-4o

@@ -12,7 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-from setup_vectordb import build_vectordb
+# from setup_vectordb import build_vectordb
 
 
 # Auto-rebuild vectordb if not present
@@ -50,11 +50,18 @@ st.divider()
 
 def load_chain():
     # Auto build vectordb if missing
-    if not os.path.exists(VECTOR_DB_FOLDER) or not os.listdir(VECTOR_DB_FOLDER):
-        st.info("Building knowledge base from docs — this takes 2-3 mins on first run...")
-        from setup_vectordb import build_vectordb
-        build_vectordb()
+    # if not os.path.exists(VECTOR_DB_FOLDER) or not os.listdir(VECTOR_DB_FOLDER):
+        # st.info("Building knowledge base from docs — this takes 2-3 mins on first run...")
+        # from setup_vectordb import build_vectordb
+        # build_vectordb()
 
+    if not os.path.exists(VECTOR_DB_FOLDER) or not os.listdir(VECTOR_DB_FOLDER):
+    st.info("Building knowledge base from docs — this takes 2-3 mins on first run...")
+    import importlib
+    svdb = importlib.import_module("setup_vectordb")
+    svdb.build_vectordb()
+    
+    
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )

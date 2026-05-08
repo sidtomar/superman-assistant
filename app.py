@@ -2,6 +2,8 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
+from dotenv import load_dotenv
+load_dotenv()
 
 import streamlit as st
 from langchain_community.embeddings import HuggingFaceEmbeddings

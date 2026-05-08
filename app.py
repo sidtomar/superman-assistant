@@ -1,10 +1,8 @@
 import os
 import warnings
 warnings.filterwarnings("ignore")
-
 from dotenv import load_dotenv
 load_dotenv()
-
 import streamlit as st
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -12,218 +10,70 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-# from setup_vectordb import build_vectordb
-
-
-# Auto-rebuild vectordb if not present
-if not os.path.exists("./superman_vectordb"):
-    with st.spinner("Building knowledge base for first time..."):
-        from setup_vectordb import setup_vectordb
-        build_vectordb()
-
 VECTOR_DB_FOLDER = "./superman_vectordb"
-
-st.set_page_config(
-    page_title="Superman Assistant",
-    page_icon="🦸",
-    layout="centered"
-)
-
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    .block-container {padding-top: 2rem;}
-    </style>
-""", unsafe_allow_html=True)
-
+DOCS_FOLDER = "./superman_docs"
+st.set_page_config(page_title="Superman Assistant", page_icon="S", layout="centered")
+st.markdown("<style>#MainMenu {visibility: hidden;}footer {visibility: hidden;}</style>", unsafe_allow_html=True)
 col1, col2 = st.columns([1, 8])
 with col1:
-    st.markdown("## 🦸")
+    st.markdown("## S")
 with col2:
     st.markdown("## Superman Assistant")
     st.caption("Ask anything about the Superman CRM platform")
-
 st.divider()
-
 @st.cache_resource(show_spinner="Loading Superman knowledge base...")
-
 def load_chain():
-    # Auto build vectordb if missing
-    # if not os.path.exists(VECTOR_DB_FOLDER) or not os.listdir(VECTOR_DB_FOLDER):
-        # st.info("Building knowledge base from docs — this takes 2-3 mins on first run...")
-        # from setup_vectordb import build_vectordb
-        # build_vectordb()
-
-    if not os.path.exists(VECTOR_DB_FOLDER) or not os.listdir(VECTOR_DB_FOLDER):
-    st.info("Building knowledge base from docs — this takes 2-3 mins on first run...")
-    import importlib
-    svdb = importlib.import_module("setup_vectordb")
-    svdb.build_vectordb()
-    
-    
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-    vectordb = Chroma(
-        persist_directory=VECTOR_DB_FOLDER,
-        embedding_function=embeddings
-    )
-
+    needs_build = (not os.path.exists(VECTOR_DB_FOLDER)) or (len(os.listdir(VECTOR_DB_FOLDER)) == 0)
+    if needs_build:
+        import importlib
+        svdb = importlib.import_module("setup_vectordb")
+        svdb.build_vectordb()
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    vectordb = Chroma(persist_directory=VECTOR_DB_FOLDER, embedding_function=embeddings)
     prompt_template = PromptTemplate(
-        template="""
-You are a Superman CRM product assistant for Mankind Pharma.
-Use the context below from Superman documentation to answer the question.
-Piece together information from multiple chunks if needed.
-Give a complete and helpful answer using all relevant information found in context.
-If the answer is genuinely not present in the context, say:
-"I don't have that information in the Superman documentation. Please refer to your Superman admin or training team."
-Do NOT make up answers not supported by the context.
-
-Context:
-{context}
-
-Question:
-{question}
-
-Answer:
-""",
+        template="You are a Superman CRM product assistant for Mankind Pharma.\nUse the context below to answer the question.\nIf not found in context say: I don't have that information in the Superman documentation.\n\nContext:\n{context}\n\nQuestion:\n{question}\n\nAnswer:",
         input_variables=["context", "question"]
     )
-
-    llm = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0,
-        openai_api_key=os.environ.get("OPENAI_API_KEY")
-    )
-
+    llm = ChatOpenAI(model="gpt-4o", temperature=0, openai_api_key=os.environ.get("OPENAI_API_KEY"))
     retriever = vectordb.as_retriever(search_kwargs={"k": 10})
-
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
-
-    chain = (
-        {
-            "context": retriever | format_docs,
-            "question": RunnablePassthrough()
-        }
-        | prompt_template
-        | llm
-        | StrOutputParser()
-    )
-
+    chain = ({"context": retriever | format_docs, "question": RunnablePassthrough()} | prompt_template | llm | StrOutputParser())
     return chain, vectordb
-
-def load_chain():
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-    vectordb = Chroma(
-        persist_directory=VECTOR_DB_FOLDER,
-        embedding_function=embeddings
-    )
-    prompt_template = PromptTemplate(
-        template="""
-You are a Superman CRM product assistant for Mankind Pharma.
-Use the context below from Superman documentation to answer the question.
-Piece together information from multiple chunks if needed.
-Give a complete and helpful answer using all relevant information found in context.
-If the answer is genuinely not present in the context, say:
-"I don't have that information in the Superman documentation. Please refer to your Superman admin or training team."
-Do NOT make up answers not supported by the context.
-
-Context:
-{context}
-
-Question:
-{question}
-
-Answer:
-""",
-        input_variables=["context", "question"]
-    )
-    llm = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0,
-        openai_api_key=os.environ.get("OPENAI_API_KEY")
-    )
-    retriever = vectordb.as_retriever(search_kwargs={"k": 10})
-
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
-
-    chain = (
-        {
-            "context": retriever | format_docs,
-            "question": RunnablePassthrough()
-        }
-        | prompt_template
-        | llm
-        | StrOutputParser()
-    )
-    return chain, vectordb
-
 def get_sources(vectordb, question):
     retriever = vectordb.as_retriever(search_kwargs={"k": 10})
     docs = retriever.invoke(question)
-    slides = sorted(set(
-        doc.metadata.get("slide", "?")
-        for doc in docs
-        if doc.metadata.get("slide")
-    ))
-    sources = sorted(set(
-        doc.metadata.get("source", "")
-        for doc in docs
-        if doc.metadata.get("source")
-    ))
+    slides = sorted(set(doc.metadata.get("slide", "?") for doc in docs if doc.metadata.get("slide")))
+    sources = sorted(set(doc.metadata.get("source", "") for doc in docs if doc.metadata.get("source")))
     return slides, sources
-
-SUGGESTED = [
-    "What are the core modules in Superman?",
-    "How does MTP approval work?",
-    "How does a MR submit their DCR?",
-    "What is NMNE in chemist journey?",
-    "How does E-detailing work?",
-    "What is the MTP submission window?",
-    "How does expense submission work?",
-    "What is AMS in Superman?"
-]
-
+SUGGESTED = ["What are the core modules in Superman?", "How does MTP approval work?", "How does a MR submit their DCR?", "What is NMNE in chemist journey?", "How does E-detailing work?", "What is the MTP submission window?", "How does expense submission work?", "What is AMS in Superman?"]
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
 try:
     chain, vectordb = load_chain()
 except Exception as e:
     st.error(f"Failed to load knowledge base: {e}")
     st.stop()
-
 if not st.session_state.messages:
     st.markdown("#### Try asking:")
     cols = st.columns(2)
     for i, question in enumerate(SUGGESTED):
         with cols[i % 2]:
             if st.button(question, key=f"suggest_{i}", use_container_width=True):
-                st.session_state.messages.append({
-                    "role": "user",
-                    "content": question
-                })
+                st.session_state.messages.append({"role": "user", "content": question})
                 st.rerun()
-
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
         if message["role"] == "assistant" and "sources" in message:
             if message["sources"][0]:
-                with st.expander("📄 Source slides used"):
-                    st.caption(f"**Slides:** {', '.join(str(s) for s in message['sources'][0])}")
-                    st.caption(f"**Document:** {', '.join(message['sources'][1])}")
-
+                with st.expander("Source slides used"):
+                    st.caption(f"Slides: {', '.join(str(s) for s in message['sources'][0])}")
+                    st.caption(f"Document: {', '.join(message['sources'][1])}")
 if prompt := st.chat_input("Ask anything about Superman..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
-
     with st.chat_message("assistant"):
         with st.spinner("Searching Superman docs..."):
             try:
@@ -234,31 +84,24 @@ if prompt := st.chat_input("Ask anything about Superman..."):
                 slides, sources = [], []
         st.markdown(response)
         if slides:
-            with st.expander("📄 Source slides used"):
-                st.caption(f"**Slides:** {', '.join(str(s) for s in slides)}")
-                st.caption(f"**Document:** {', '.join(sources)}")
-
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": response,
-        "sources": (slides, sources)
-    })
-
+            with st.expander("Source slides used"):
+                st.caption(f"Slides: {', '.join(str(s) for s in slides)}")
+                st.caption(f"Document: {', '.join(sources)}")
+    st.session_state.messages.append({"role": "assistant", "content": response, "sources": (slides, sources)})
 with st.sidebar:
-    st.markdown("### 🦸 Superman Assistant")
+    st.markdown("### Superman Assistant")
     st.caption("Powered by Mankind Pharma")
     st.divider()
     st.markdown("**Knowledge Base**")
-    st.success(f"✅ {vectordb._collection.count()} vectors indexed")
+    st.success(f"Vectors indexed: {vectordb._collection.count()}")
     st.divider()
     st.markdown("**Documents Loaded**")
-    if os.path.exists("./superman_docs"):
-        files = [f for f in os.listdir("./superman_docs")
-                 if f.endswith(('.pptx', '.pdf', '.docx'))]
+    if os.path.exists(DOCS_FOLDER):
+        files = [f for f in os.listdir(DOCS_FOLDER) if f.endswith((".pptx", ".pdf", ".docx"))]
         for f in files:
-            st.caption(f"📄 {f}")
+            st.caption(f"- {f}")
     st.divider()
-    if st.button("🗑️ Clear chat", use_container_width=True):
+    if st.button("Clear chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
     st.divider()

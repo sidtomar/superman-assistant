@@ -75,23 +75,23 @@ if prompt := st.chat_input("Ask anything about Superman..."):
     with st.chat_message("user"):
         st.markdown(prompt)
     with st.chat_message("assistant"):
-		with st.spinner("Searching Superman docs..."):
-            try:
-                # DEBUG: Show what chunks are being passed to GPT-4o
-                retriever_dbg = vectordb.as_retriever(search_kwargs={"k": 10})
-                debug_docs = retriever_dbg.invoke(prompt)
-                
-                with st.expander("🔍 DEBUG: Chunks sent to GPT-4o"):
-                    for i, d in enumerate(debug_docs):
-                        st.markdown(f"**Chunk {i+1} | Slide {d.metadata.get('slide','?')} | {d.metadata.get('source','?')}**")
-                        st.code(d.page_content[:300])
-                
-                response = chain.invoke(prompt)
-                slides, sources = get_sources(vectordb, prompt)
-            except Exception as e:
-                response = f"ERROR: {type(e).__name__}: {e}"
-                slides, sources = [], []
-                st.error(f"Full error: {e}")		
+	with st.spinner("Searching Superman docs..."):
+		try:
+			# DEBUG: Show what chunks are being passed to GPT-4o
+			retriever_dbg = vectordb.as_retriever(search_kwargs={"k": 10})
+			debug_docs = retriever_dbg.invoke(prompt)
+			
+			with st.expander("🔍 DEBUG: Chunks sent to GPT-4o"):
+				for i, d in enumerate(debug_docs):
+					st.markdown(f"**Chunk {i+1} | Slide {d.metadata.get('slide','?')} | {d.metadata.get('source','?')}**")
+					st.code(d.page_content[:300])
+			
+			response = chain.invoke(prompt)
+			slides, sources = get_sources(vectordb, prompt)
+		except Exception as e:
+			response = f"ERROR: {type(e).__name__}: {e}"
+			slides, sources = [], []
+			st.error(f"Full error: {e}")		
 				
         st.markdown(response)
         if slides:

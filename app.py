@@ -47,6 +47,66 @@ with col2:
 st.divider()
 
 @st.cache_resource(show_spinner="Loading Superman knowledge base...")
+
+def load_chain():
+    # Auto build vectordb if missing
+    if not os.path.exists(VECTOR_DB_FOLDER) or not os.listdir(VECTOR_DB_FOLDER):
+        st.info("Building knowledge base from docs — this takes 2-3 mins on first run...")
+        from setup_vectordb import build_vectordb
+        build_vectordb()
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    vectordb = Chroma(
+        persist_directory=VECTOR_DB_FOLDER,
+        embedding_function=embeddings
+    )
+
+    prompt_template = PromptTemplate(
+        template="""
+You are a Superman CRM product assistant for Mankind Pharma.
+Use the context below from Superman documentation to answer the question.
+Piece together information from multiple chunks if needed.
+Give a complete and helpful answer using all relevant information found in context.
+If the answer is genuinely not present in the context, say:
+"I don't have that information in the Superman documentation. Please refer to your Superman admin or training team."
+Do NOT make up answers not supported by the context.
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:
+""",
+        input_variables=["context", "question"]
+    )
+
+    llm = ChatOpenAI(
+        model="gpt-4o",
+        temperature=0,
+        openai_api_key=os.environ.get("OPENAI_API_KEY")
+    )
+
+    retriever = vectordb.as_retriever(search_kwargs={"k": 10})
+
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough()
+        }
+        | prompt_template
+        | llm
+        | StrOutputParser()
+    )
+
+    return chain, vectordb
+
 def load_chain():
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"

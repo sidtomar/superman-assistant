@@ -3,7 +3,6 @@ langchain-community
 langchain-openai
 langchain-core
 langchain-text-splitters
-langchain-chroma
 chromadb
 sentence-transformers
 openai
@@ -12,3 +11,5 @@ python-pptx
 lxml
 pypdf
 docx2txt
+python-dotenv
+torchvision

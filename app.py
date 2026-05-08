@@ -2,6 +2,7 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
+
 import streamlit as st
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -9,6 +10,14 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+
+
+
+# Auto-rebuild vectordb if not present
+if not os.path.exists("./superman_vectordb"):
+    with st.spinner("Building knowledge base for first time..."):
+        from setup_vectordb import setup_vectordb
+        build_vectordb()
 
 VECTOR_DB_FOLDER = "./superman_vectordb"
 
